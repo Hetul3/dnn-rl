@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+# Playground Test Files
+/include/tiny_rl/scratch/
