@@ -45,7 +45,7 @@ namespace tiny_rl
                 return batch;
             batch.reserve(batch_size);
             std::uniform_int_distribution<size_t> dist(0, buffer.size() - 1);
-            for (int i = 0; i < batch_size; ++i)
+            for (size_t i = 0; i < batch_size; ++i)
             {
                 size_t idx = dist(rng);
                 batch.push_back(buffer[idx]);
@@ -58,8 +58,8 @@ namespace tiny_rl
         }
 
     private:
-        int capacity;
-        int index;
+        size_t capacity;
+        size_t index;
         std::vector<Experience> buffer;
         std::mt19937 rng{std::random_device{}()};
     };
