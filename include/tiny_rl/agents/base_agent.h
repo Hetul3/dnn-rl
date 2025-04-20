@@ -20,8 +20,9 @@ namespace tiny_rl
       
         virtual void seed(unsigned int seed) {};
 
-        virtual void save(const std::string &path) = 0;
-        virtual void load(const std::string &path) = 0;
+        // TODO - implement save and load methods
+        //virtual void save(const std::string &path) = 0;
+        //virtual void load(const std::string &path) = 0;
 
         virtual ~BaseAgent() = default;
     };

@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstdlib>
 #include <random>
+#include <cassert>
 #include <algorithm>
 #include "tiny_dnn/tiny_dnn.h"
 
@@ -20,58 +21,67 @@ namespace tiny_rl
     {
     public:
         explicit ReplayBuffer(size_t capacity)
-            : capacity(capacity), index(0)
+            : capacity(capacity),
+              size_(0),
+              pos_(0),
+              buffer_(capacity),
+              dist_(0, capacity - 1),
+              rng_(std::random_device{}())
         {
-            buffer.reserve(capacity);
         }
 
-        void add(const Experience &exp)
+        void add(Experience &&exp)
         {
-            if (buffer.size() < capacity)
-            {
-                buffer.push_back(exp);
-            }
-            else
-            {
-                buffer[index] = exp;
-            }
-            index = (index + 1) % capacity;
+            buffer_[pos_] = std::move(exp);
+            advance_();
+        }
+
+        void add(const Experience &exp) {
+            buffer_[pos_] = exp;
+            advance_();
         }
 
         // Randomly sample a batch of experiences from the buffer
-        std::vector<Experience> sample(size_t batch_size)
+        void sample(std::vector<Experience> &out, size_t batch_size)
         {
-            if (buffer.empty())
-            {
-                return {};
-            }
+            assert(size_ > 0);
+            assert(batch_size <= size_);
 
-            std::vector<Experience> batch;
-            batch.reserve(batch_size);
+            out.clear();
+            out.resize(batch_size);
+            dist_.param(typename decltype(dist_)::param_type(0, size_ - 1));
 
-            std::uniform_int_distribution<size_t> dist(0, buffer.size() - 1);
             for (size_t i = 0; i < batch_size; ++i)
             {
-                batch.push_back(buffer[dist(rng)]);
+                out[i] = buffer_[dist_(rng_)];
             }
-            return batch;
         }
 
-        size_t size() const
+        size_t size() const noexcept
         {
-            return buffer.size();
+            return size_;
         }
 
-        void clear()
+        void clear() noexcept
         {
-            buffer.clear();
-            index = 0;
+            size_ = pos_ = 0;
         }
 
     private:
+        void advance_()
+        {
+            pos_ = (pos_ + 1) % capacity;
+            if (size_ < capacity)
+            {
+                ++size_;
+            }
+        }
+
         size_t capacity;
-        size_t index;
-        std::vector<Experience> buffer;
-        std::mt19937 rng{std::random_device{}()};
+        size_t size_;
+        size_t pos_;
+        std::vector<Experience> buffer_;
+        std::mt19937 rng_;
+        std::uniform_int_distribution<size_t> dist_;
     };
 }
