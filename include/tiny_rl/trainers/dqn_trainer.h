@@ -12,45 +12,44 @@ namespace tiny_rl
     class DQNTrainer : public BaseTrainer
     {
     public:
-        DQNTrainer(DQNAgent &agent, std::shared_ptr<BaseEnv> env)
-            : BaseTrainer(agent, env), dqn_agent(agent) {}
+        DQNTrainer(DQNAgent &agent,
+                   std::shared_ptr<BaseEnv> env)
+            : BaseTrainer(agent, env), agent_(agent) {}
 
+        // Run episodes
         void train(int episodes) override
         {
-            for (int ep = 0; ep < episodes; ++ep)
+            for (int ep = 1; ep <= episodes; ++ep)
             {
-                auto state = env->reset();
-                bool done = false;
-                float steps = 0;
+                auto raw_state = env->reset();
+                tiny_dnn::vec_t state(raw_state.begin(), raw_state.end());
+
                 float total_reward = 0.0f;
+                bool done = false;
 
                 while (!done)
                 {
-                    tiny_dnn::vec_t input(state.begin(), state.end());
-                    int action = dqn_agent.select_action(input);
+                    int action = agent_.select_action(state);
+                    auto [next_raw_state, reward, terminal] = env->step(action);
+                    tiny_dnn::vec_t next_state(next_raw_state.begin(), next_raw_state.end());
 
-                    auto [next_state, reward, terminal] = env->step(action);
-                    done = terminal;
+                    agent_.store_experience(state, action, reward, next_state, terminal);
+                    agent_.learn();
+
+                    state = std::move(next_state);
                     total_reward += reward;
-
-                    dqn_agent.store_experience(
-                        input,
-                        action,
-                        reward,
-                        tiny_dnn::vec_t(next_state.begin(), next_state.end()),
-                        done);
-
-                    dqn_agent.learn();
-                    state = next_state;
-                    ++steps;
+                    done = terminal;
                 }
-                std::cout << "Episode: " << ep + 1 << " finished in "
-                          << steps << " steps, total reward: "
-                          << total_reward << std::endl;
+                std::cout
+                    << "Episode: "
+                    << ep
+                    << " finished with total reward: "
+                    << total_reward
+                    << std::endl;
             }
         }
 
     private:
-        DQNAgent &dqn_agent;
+        DQNAgent &agent_;
     };
 }

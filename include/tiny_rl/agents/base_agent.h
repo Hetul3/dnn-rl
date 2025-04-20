@@ -13,7 +13,16 @@ namespace tiny_rl
 
         
         virtual void learn() = 0;
+
+        virtual void reset() {};
+
+        virtual void on_episode_end() {};
       
+        virtual void seed(unsigned int seed) {};
+
+        virtual void save(const std::string &path) = 0;
+        virtual void load(const std::string &path) = 0;
+
         virtual ~BaseAgent() = default;
     };
 }

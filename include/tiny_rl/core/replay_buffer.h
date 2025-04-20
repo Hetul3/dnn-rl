@@ -38,23 +38,34 @@ namespace tiny_rl
             index = (index + 1) % capacity;
         }
 
+        // Randomly sample a batch of experiences from the buffer
         std::vector<Experience> sample(size_t batch_size)
         {
+            if (buffer.empty())
+            {
+                return {};
+            }
+
             std::vector<Experience> batch;
-            if (batch.empty())
-                return batch;
             batch.reserve(batch_size);
+
             std::uniform_int_distribution<size_t> dist(0, buffer.size() - 1);
             for (size_t i = 0; i < batch_size; ++i)
             {
-                size_t idx = dist(rng);
-                batch.push_back(buffer[idx]);
+                batch.push_back(buffer[dist(rng)]);
             }
             return batch;
         }
+
         size_t size() const
         {
             return buffer.size();
+        }
+
+        void clear()
+        {
+            buffer.clear();
+            index = 0;
         }
 
     private:
