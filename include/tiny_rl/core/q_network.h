@@ -1,5 +1,6 @@
 #pragma once
 #include <tiny_dnn/tiny_dnn.h>
+#include <iostream>
 #include <memory>
 
 namespace tiny_rl
@@ -9,8 +10,12 @@ namespace tiny_rl
 
         // initialize the trainable network and the target network crucial in DQN
     public:
-        QNetwork(tiny_dnn::network<tiny_dnn::sequential> &user_net)
-            : net(user_net), target_net(user_net) {}
+        QNetwork(tiny_dnn::network<tiny_dnn::sequential> &online,
+                 tiny_dnn::network<tiny_dnn::sequential> &target)
+            : net(online), target_net(target)
+        {
+            update_target_network(1.0f);
+        }
 
         // get Q-values for a single state
         // Takes in the env state and returns the Q-values for the actions
@@ -26,11 +31,29 @@ namespace tiny_rl
         // get Q-values for a batch of states
         std::vector<tiny_dnn::vec_t> predict_batch(const std::vector<tiny_dnn::vec_t> &states, bool use_target = false)
         {
-            if (use_target)
+            std::vector<tiny_dnn::vec_t> outputs;
+            outputs.reserve(states.size());
+
+            for (auto const &s : states)
             {
-                return target_net.predict(states);
+                outputs.push_back(use_target
+                                      ? target_net.predict(s)
+                                      : net.predict(s));
             }
-            return net.predict(states);
+            return outputs;
+        }
+
+        inline void clip_weights(tiny_dnn::network<tiny_dnn::sequential> &n, float limit = 6.0f)
+        {
+            for (size_t l = 0; l < n.depth(); ++l)
+                for (auto &w : n[l]->weights())
+                    for (auto &v : *w)
+                    {
+                        if (v > limit)
+                            v = limit;
+                        if (v < -limit)
+                            v = -limit;
+                    }
         }
 
         // Update network with TD targets
@@ -38,6 +61,7 @@ namespace tiny_rl
         {
             assert(states.size() == td_targets.size());
             net.train<tiny_dnn::mse>(opt, states, td_targets, batch_size, epochs);
+            clip_weights(net);
         }
 
         // Get max Q-value for a state
@@ -55,10 +79,10 @@ namespace tiny_rl
         }
 
         // Get max Q-value index for a state, helpful for the agent
-        int argmax_action(const tiny_dnn::vec_t &q_values) {
+        int argmax_action(const tiny_dnn::vec_t &q_values)
+        {
             return static_cast<int>(
-                std::distance(q_values.begin(), std::max_element(q_values.begin(), q_values.end()))
-            );
+                std::distance(q_values.begin(), std::max_element(q_values.begin(), q_values.end())));
         }
 
         // Compute TD targets: r + gamma * max_a' Q(s', a')
@@ -82,10 +106,13 @@ namespace tiny_rl
             std::vector<tiny_dnn::vec_t> td_targets = current_q;
             for (size_t i = 0; i < rewards.size(); ++i)
             {
-                float max_next = get_max_q_value(next_q[i]);
+                auto next_online = predict(next_states[i], false);
+                int best_act = argmax_action(next_online);
+                float max_next = next_q[i][best_act];
                 float td_target = rewards[i] + (dones[i] ? 0.0f : gamma * max_next);
                 td_targets[i][actions[i]] = td_target;
-                assert(actions[i] >= 0 && actions[i] < td_targets[i].size());
+                assert(actions[i] >= 0 &&
+                       static_cast<size_t>(actions[i]) < td_targets[i].size());
             }
             return td_targets;
         }
@@ -94,30 +121,17 @@ namespace tiny_rl
         void update_target_network(float tau = 1.0f)
         {
             if (tau >= 1.0f)
+                tau = 1.0f; // force exact copy
+            for (size_t l = 0; l < net.depth(); ++l)
             {
-                target_net = net;
-            }
-            else
-            {
-                // soft update: θ_target ← τ·θ_net + (1–τ)·θ_target
-                for (size_t l = 0; l < net.depth(); ++l)
+                auto src_params = net[l]->weights();
+                auto tgt_params = target_net[l]->weights();
+                for (size_t p = 0; p < src_params.size(); ++p)
                 {
-                    auto src_layer = net[l];
-                    auto tgt_layer = target_net[l];
-
-                    auto src_params = src_layer->weights();
-                    auto tgt_params = tgt_layer->weights();
-
-                    for (size_t p = 0; p < src_params.size(); ++p)
-                    {
-                        auto &src = *src_params[p];
-                        auto &tgt = *tgt_params[p];
-
-                        for (size_t i = 0; i < src.size(); ++i)
-                        {
-                            tgt[i] = tau * src[i] + (1.0f - tau) * tgt[i];
-                        }
-                    }
+                    auto &src = *src_params[p];
+                    auto &tgt = *tgt_params[p];
+                    for (size_t i = 0; i < src.size(); ++i)
+                        tgt[i] = tau * src[i] + (1.0f - tau) * tgt[i];
                 }
             }
         }
@@ -134,7 +148,7 @@ namespace tiny_rl
         }
 
     private:
-        tiny_dnn::network<tiny_dnn::sequential> net;
-        tiny_dnn::network<tiny_dnn::sequential> target_net;
+        tiny_dnn::network<tiny_dnn::sequential>& net;
+        tiny_dnn::network<tiny_dnn::sequential>& target_net;
     };
 }

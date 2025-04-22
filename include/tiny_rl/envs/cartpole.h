@@ -36,8 +36,9 @@ namespace tiny_rl
             state_ = {0.0f, 0.0f, 0.05f, 0.0f};
         }
 
-        const std::vector<float> get_state() const {
-            return state_;
+        const std::vector<float> get_state() const
+        {
+            return normalize_state(state_);
         }
 
         virtual std::vector<float> reset() override
@@ -48,7 +49,7 @@ namespace tiny_rl
                 (rand() % 1000 - 500) / 10000.0f, // pole angle is slightly randomized, for the start
                 0.0f};
             step_ = 0;
-            return state_;
+            return normalize_state(state_);
         }
 
         virtual std::tuple<std::vector<float>, float, bool> step(int action) override
@@ -68,10 +69,10 @@ namespace tiny_rl
             float x_acc = temp - pole_mass_length_ * theta_acc * cos_theta / total_mass_;
 
             // Update state using Euler integration
-            x_dot = x_dot + tau_ * x_acc;
-            x = x + tau_ * x_dot;
-            theta_dot = theta_dot + tau_ * theta_acc;
-            theta = theta + tau_ * theta_dot;
+            x_dot += tau_ * x_acc;
+            x += tau_ * x_dot;
+            theta_dot += tau_ * theta_acc;
+            theta += tau_ * theta_dot;
 
             state_ = {x, x_dot, theta, theta_dot};
             step_++;
@@ -81,19 +82,8 @@ namespace tiny_rl
                         theta < -0.209f || theta > 0.209f ||
                         step_ >= 500;
 
-            float reward = 1.0f; // reward for each step taken
-            if (done)
-            {
-                if (step_ >= 500)
-                {
-                    reward = 0.0f; // no reward for reaching the max steps
-                }
-                else
-                {
-                    reward = -10.0f; // negative reward for failing
-                }
-            }
-            return {state_, reward, done};
+            float reward = 1.0f;
+            return {normalize_state(state_), reward, done};
         }
 
         virtual int state_size() const override
@@ -107,6 +97,11 @@ namespace tiny_rl
         }
 
     private:
+        std::vector<float> normalize_state(const std::vector<float> &s) const
+        {
+            return {s[0] / 2.4f, s[1] / 3.0f, s[2] / 0.209f, s[3] / 4.0f};
+        }
+
         std::vector<float> state_;
         int step_;
         float gravity_;

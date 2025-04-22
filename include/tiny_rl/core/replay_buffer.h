@@ -25,8 +25,8 @@ namespace tiny_rl
               size_(0),
               pos_(0),
               buffer_(capacity),
-              dist_(0, capacity - 1),
-              rng_(std::random_device{}())
+              rng_(std::random_device{}()),
+              dist_(0, capacity - 1)
         {
         }
 
@@ -36,7 +36,8 @@ namespace tiny_rl
             advance_();
         }
 
-        void add(const Experience &exp) {
+        void add(const Experience &exp)
+        {
             buffer_[pos_] = exp;
             advance_();
         }

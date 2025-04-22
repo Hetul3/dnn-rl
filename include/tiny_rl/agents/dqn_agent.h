@@ -23,7 +23,6 @@ namespace tiny_rl
         {
             optimizer.alpha = config.learning_rate;
             qnet.update_target_network(1.0f);
-
             sample_buffer_.reserve(config.batch_size);
         }
 
@@ -54,6 +53,12 @@ namespace tiny_rl
             ++env_steps_;
         }
 
+        void on_episode_end() override
+        {
+            config.epsilon = std::max(config.epsilon_min,
+                                      config.epsilon * config.epsilon_decay);
+        }
+
         void learn() override
         {
             // don't learn until we have been through minimum amount of steps
@@ -65,7 +70,7 @@ namespace tiny_rl
                 return;
 
             // don't learn if the replay buffer is not full yet
-            if (replay_buffer.size() < config.batch_size)
+            if (replay_buffer.size() < static_cast<size_t>(config.batch_size))
                 return;
 
             replay_buffer.sample(sample_buffer_, config.batch_size);
@@ -90,10 +95,6 @@ namespace tiny_rl
 
             qnet.train(states_, td_targets, optimizer, config.batch_size);
             ++train_steps_;
-
-            config.epsilon = std::max(
-                config.epsilon_min,
-                config.epsilon * config.epsilon_decay);
 
             if (train_steps_ % config.target_update_freq == 0)
             {

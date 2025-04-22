@@ -19,6 +19,7 @@ namespace tiny_rl
         // Run episodes
         void train(int episodes) override
         {
+            float avg_reward_100 = 0.0f;
             for (int ep = 1; ep <= episodes; ++ep)
             {
                 auto raw_state = env->reset();
@@ -40,12 +41,17 @@ namespace tiny_rl
                     total_reward += reward;
                     done = terminal;
                 }
-                std::cout
-                    << "Episode: "
-                    << ep
-                    << " finished with total reward: "
-                    << total_reward
-                    << std::endl;
+                agent_.on_episode_end();
+                avg_reward_100 += total_reward;
+
+                if (ep % 100 == 0)
+                {
+                    std::cout << "Episode: " << ep
+                              << " average reward: " << avg_reward_100 / 100
+                              << std::endl;
+
+                    avg_reward_100 = 0.0f;
+                }
             }
         }
 

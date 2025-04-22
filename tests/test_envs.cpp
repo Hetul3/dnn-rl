@@ -124,8 +124,7 @@ TEST_CASE(test_cartpole_rewards)
     {
         // Check if failure reward is correctly implemented
         // This check depends on the actual implementation
-        // Some implementations use -1, -10, or 0 for failure
-        CHECK(last_reward == 1.0f || last_reward == -1.0f || last_reward == -10.0f || last_reward == 0.0f);
+        CHECK(last_reward == 1.0f || last_reward == -1.0f || last_reward == 0.0f || last_reward == 0.0f);
     }
 }
 

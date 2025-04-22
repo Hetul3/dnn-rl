@@ -12,7 +12,7 @@ namespace tiny_rl
         int batch_size;
         int memory_size;
         int target_update_freq;
-        int learn_start = 0;        // env steps before training begins
-        int train_frequency = 1;    // how many steps between gradient updates
+        int learn_start = 500;        // env steps before training begins
+        int train_frequency = 4;    // how many steps between gradient updates
     };
 }
