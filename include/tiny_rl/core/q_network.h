@@ -43,7 +43,7 @@ namespace tiny_rl
             return outputs;
         }
 
-        inline void clip_weights(tiny_dnn::network<tiny_dnn::sequential> &n, float limit = 6.0f)
+        inline void clip_weights(tiny_dnn::network<tiny_dnn::sequential> &n, float limit = 10.0f)
         {
             for (size_t l = 0; l < n.depth(); ++l)
                 for (auto &w : n[l]->weights())
@@ -61,7 +61,7 @@ namespace tiny_rl
         {
             assert(states.size() == td_targets.size());
             net.train<tiny_dnn::mse>(opt, states, td_targets, batch_size, epochs);
-            clip_weights(net);
+            // clip_weights(net);
         }
 
         // Get max Q-value for a state
@@ -121,7 +121,7 @@ namespace tiny_rl
         void update_target_network(float tau = 1.0f)
         {
             if (tau >= 1.0f)
-                tau = 1.0f; // force exact copy
+                tau = 1.0f;
             for (size_t l = 0; l < net.depth(); ++l)
             {
                 auto src_params = net[l]->weights();

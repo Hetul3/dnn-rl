@@ -5,6 +5,7 @@
 #include "base_agent.h"
 #include "../core/q_network.h"
 #include "../core/replay_buffer.h"
+#include "../optim/clipped_adam.h"
 #include "../utils/config.h"
 
 namespace tiny_rl
@@ -22,6 +23,8 @@ namespace tiny_rl
               sample_buffer_()
         {
             optimizer.alpha = config.learning_rate;
+            optimizer.b1 = 0.9f;
+            optimizer.b2 = 0.999f;
             qnet.update_target_network(1.0f);
             sample_buffer_.reserve(config.batch_size);
         }
@@ -61,6 +64,10 @@ namespace tiny_rl
 
         void learn() override
         {
+            // don't learn if the replay buffer is not full enough for batch_size
+            if (replay_buffer.size() < static_cast<size_t>(config.batch_size))
+                return;
+
             // don't learn until we have been through minimum amount of steps
             if (env_steps_ < static_cast<size_t>(config.learn_start))
                 return;
@@ -69,11 +76,13 @@ namespace tiny_rl
             if (env_steps_ % config.train_frequency != 0)
                 return;
 
-            // don't learn if the replay buffer is not full yet
-            if (replay_buffer.size() < static_cast<size_t>(config.batch_size))
-                return;
-
             replay_buffer.sample(sample_buffer_, config.batch_size);
+
+            float avg_done = std::accumulate(dones_.begin(), dones_.end(), 0.0f) / dones_.size();
+            if (avg_done > 0.8f)
+            {
+                std::cout << "[BUF] done_ratio " << avg_done << std::endl;
+            }
 
             states_.clear();
             next_states_.clear();
@@ -94,18 +103,53 @@ namespace tiny_rl
                 states_, actions_, rewards_, next_states_, dones_, config.gamma);
 
             qnet.train(states_, td_targets, optimizer, config.batch_size);
+
+            if (train_steps_ % config.target_update_freq == 0 && train_steps_ > 0)
+            {
+                std::cout
+                    << "Updating target network"
+                    << std::endl;
+                qnet.update_target_network(1.0f);
+            }
+
             ++train_steps_;
 
-            if (train_steps_ % config.target_update_freq == 0)
-            {
-                qnet.update_target_network(1.0f);
+            static size_t dbg_step = 0;
+            if (++dbg_step % 500 == 0)
+            { // print every 500 grad steps
+                /* 1a. running loss (MSE) */
+                float batch_loss = 0.0f;
+                for (size_t i = 0; i < states_.size(); ++i)
+                    batch_loss += tiny_dnn::mse::f(td_targets[i], qnet.predict(states_[i]));
+                batch_loss /= states_.size();
+
+                /* 1b. maximum |Q| in the online network */
+                float q_abs_max = 0.0f;
+                for (auto &q : qnet.predict_batch(states_))
+                    for (float v : q)
+                        q_abs_max = std::max(q_abs_max, std::fabs(v));
+
+                /* 1c. L2-norm of all weights */
+                float w_norm = 0.0f;
+                for (size_t l = 0; l < qnet.get_net().depth(); ++l)
+                    for (auto &W : qnet.get_net()[l]->weights())
+                        for (float v : *W)
+                            w_norm += v * v;
+                w_norm = std::sqrt(w_norm);
+
+                std::cout << "[DBG] step " << train_steps_
+                          << "  loss " << batch_loss
+                          << "  |Q|_max " << q_abs_max
+                          << "  ||W||_2 " << w_norm
+                          << "  eps " << config.epsilon
+                          << std::endl;
             }
         }
 
     private:
         QNetwork &qnet;
         DQNConfig config;
-        tiny_dnn::adam optimizer;
+        tiny_rl::clipped_adam optimizer;
         ReplayBuffer replay_buffer;
         std::mt19937 rng;
         size_t env_steps_;
