@@ -5,6 +5,7 @@
 #include "base_agent.h"
 #include "../core/q_network.h"
 #include "../core/replay_buffer.h"
+#include "../core/prioritized_replay_buffer.h"
 #include "../optim/clipped_adam.h"
 #include "../utils/config.h"
 
@@ -76,7 +77,9 @@ namespace tiny_rl
             if (env_steps_ % config.train_frequency != 0)
                 return;
 
-            replay_buffer.sample(sample_buffer_, config.batch_size);
+            std::vector<size_t> indices;
+            std::vector<float> is_weights;
+            replay_buffer.sample(sample_buffer_, indices, is_weights, config.batch_size);
 
             float avg_done = std::accumulate(dones_.begin(), dones_.end(), 0.0f) / dones_.size();
             if (avg_done > 0.8f)
@@ -103,6 +106,14 @@ namespace tiny_rl
                 states_, actions_, rewards_, next_states_, dones_, config.gamma);
 
             qnet.train(states_, td_targets, optimizer, config.batch_size);
+
+            std::vector<float> td_errors(config.batch_size);
+            for(size_t i = 0; i < static_cast<size_t>(config.batch_size); ++i) {
+                float q_old = qnet.predict(states_[i])[actions_[i]];
+                td_errors[i] = std::fabs(td_targets[i][actions_[i]] - q_old);
+            }
+
+            replay_buffer.update_priorities(indices, td_errors);
 
             if (train_steps_ % config.target_update_freq == 0 && train_steps_ > 0)
             {
@@ -150,7 +161,7 @@ namespace tiny_rl
         QNetwork &qnet;
         DQNConfig config;
         tiny_rl::clipped_adam optimizer;
-        ReplayBuffer replay_buffer;
+        PrioritizedReplayBuffer replay_buffer;
         std::mt19937 rng;
         size_t env_steps_;
         size_t train_steps_;
