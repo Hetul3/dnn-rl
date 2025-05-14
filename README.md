@@ -203,9 +203,3 @@ struct PPOConfig {
 * DQN & PPO agents
 * GridWorldEnv (coming soon)
 * Populate `examples/` with training scripts
-
----
-
-## License
-
-This project is MIT-licensed. See [LICENSE](LICENSE) for details.
