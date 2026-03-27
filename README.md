@@ -14,8 +14,8 @@ A header-only C++ reinforcement-learning extension built on top of [tiny-dnn](ht
   * Proximal Policy Optimization (PPO)
 * **Environments**
 
-  * `CartPoleEnv` (implemented)
-  * `GridWorldEnv` (coming soon)
+  * `CartPoleEnv`
+  * `GridWorldEnv`
 * **Config structs** for easy hyperparameter tuning
 
   * `tiny_rl::DQNConfig`
